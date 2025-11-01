@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<title>Lucky Brothers günlük Kasa Hesaplama Sistemi</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+:root{--bg:#0f172a;--panel:#111827;--text:#e5e7eb;--border:#1f2937;--ok:#22c55e;--bad:#ef4444;}
+body{margin:0;font-family:system-ui;background:#0f172a;color:var(--text);padding:24px;}
+.wrap{max-width:900px;margin:auto}
+.title{font-size:24px;font-weight:800;margin-bottom:12px}
+.badge{background:#a78bfa;padding:3px 8px;border-radius:10px;font-size:13px}
+.panel{background:#0b1220;border:1px solid var(--border);border-radius:12px;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.field{display:flex;align-items:center;gap:8px;background:#111827;border:1px solid #1e293b;padding:8px;border-radius:8px}
+label{flex:1;font-size:14px}
+input,select{width:140px;background:#0b1220;color:white;border:1px solid #334155;border-radius:8px;padding:8px;text-align:right}
+button{background:#1e293b;color:white;border:1px solid #334155;padding:7px 12px;margin-right:5px;border-radius:8px;cursor:pointer}
+button:hover{filter:brightness(1.15)}
+table{width:100%;margin-top:15px;border-collapse:collapse;font-size:14px}
+td{border-bottom:1px solid #1f2937;padding:8px}
+.right{text-align:right}
+.pill{padding:5px 10px;border-radius:8px;font-weight:bold;font-size:14px}
+.ok{background:rgba(34,197,94,.25);color:#22c55e}
+.bad{background:rgba(239,68,68,.25);color:#ef4444}
+.sumPos{color:#22c55e;font-weight:bold}
+.sumNeg{color:#ef4444;font-weight:bold}
+.sumZero{color:#38bdf8;font-weight:bold}
+.flex-between{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<div class="title"><span class="badge">v1.5</span> Lucky Brothers günlük Kasa Hesaplama Sistemi</div>
+
+<div class="flex-between">
+  <div>
+    <label>Kasa Seç:</label>
+    <select id="kasa_sec">
+      <option value="Kasa 1">Kasa 1</option>
+      <option value="Kasa 2">Kasa 2</option>
+    </select>
+  </div>
+
+  <div>
+    <label>Kasiyer:</label>
+    <select id="kasiyer_sec">
+      <option value="Babajan">Babajan</option>
+      <option value="Alisher">Alisher</option>
+      <option value="Ana">Ana</option>
+      <option value="Fatma">Fatma</option>
+      <option value="Neşe">Neşe</option>
+    </select>
+  </div>
+</div>
+
+<div class="panel">
+<div class="grid">
+<div class="field"><label>1) Toplam X Raporu</label>₺<input id="toplam_x"></div>
+<div class="field"><label>2) Öğlen X Raporu</label>₺<input id="oglen_x"></div>
+<div class="field"><label>3) Öğlen Avans</label>₺<input id="oglen_avans"></div>
+<div class="field"><label>4) Artılar ekstra para</label>₺<input id="artilar"></div>
+<div class="field"><label>5) Eksiler çıkan para</label>₺<input id="eksiler"></div>
+<div class="field"><label>6) POS 1</label>₺<input id="pos1"></div>
+<div class="field"><label>7) POS 2</label>₺<input id="pos2"></div>
+<div class="field"><label>8) POS 3</label>₺<input id="pos3"></div>
+<div class="field"><label>9) POS 4</label>₺<input id="pos4"></div>
+<div class="field"><label>10) Nakit</label>₺<input id="nakit"></div>
+<div class="field"><label>11) Akşam Avans</label>₺<input id="aksam_avans"></div>
+</div>
+
+<br>
+<button onclick="clearAll()">Sıfırla</button>
+<button onclick="demo()">Örnek Doldur</button>
+<button onclick="sendWA()">WhatsApp Gönder</button>
+
+<table id="summary"><tbody></tbody></table>
+
+<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+<div id="resultText" class="pill">Hesap bekleniyor…</div>
+<div id="resultAmount" class="right">₺0,00</div>
+</div>
+</div>
+</div>
+
+<script>
+const f=id=>parseFloat(document.getElementById(id).value)||0;
+const fmt=x=>x.toLocaleString("tr-TR",{style:"currency",currency:"TRY"});
+
+function calc(){
+const d={toplam_x:f("toplam_x"), oglen_x:f("oglen_x"), oglen_avans:f("oglen_avans"), artilar:f("artilar"), eksiler:f("eksiler"),
+pos1:f("pos1"), pos2:f("pos2"), pos3:f("pos3"), pos4:f("pos4"), nakit:f("nakit"), aksam_avans:f("aksam_avans")};
+
+const hesap = d.toplam_x - d.oglen_x + d.oglen_avans + d.artilar - d.eksiler - d.pos1 - d.pos2 - d.pos3 - d.pos4 - d.nakit - d.aksam_avans;
+const sonuc = -hesap;
+
+const items=[
+["Toplam X",d.toplam_x],["Öğlen X",-d.oglen_x],["Öğlen Avans (+)",d.oglen_avans],["Artılar (+)",d.artilar],["Eksiler (-)",-d.eksiler],
+["POS1 (-)",-d.pos1],["POS2 (-)",-d.pos2],["POS3 (-)",-d.pos3],["POS4 (-)",-d.pos4],["Nakit (-)",-d.nakit],["Akşam Avans (-)",-d.aksam_avans],["TOPLAM",sonuc]
+];
+
+document.querySelector("#summary tbody").innerHTML = items.map(([n,v],i)=>`<tr><td>${n}</td><td class="right ${i===items.length-1?(sonuc===0?"sumZero":sonuc>0?"sumPos":"sumNeg"):""}">${fmt(v)}</td></tr>`).join("");
+
+const r=document.getElementById("resultText"); r.className="pill";
+if(sonuc===0){r.textContent="✅ KASA TAM";r.classList.add("ok");}
+else if(sonuc>0){r.textContent="✅ KASA FAZLA";r.classList.add("ok");}
+else{r.textContent="⚠️ KASA EKSİK";r.classList.add("bad");}
+
+document.getElementById("resultAmount").textContent = fmt(Math.abs(sonuc));
+}
+
+function clearAll(){document.querySelectorAll("input").forEach(i=>i.value="");calc();}
+
+function demo(){
+document.getElementById("toplam_x").value=171075;
+document.getElementById("oglen_x").value=0;
+document.getElementById("oglen_avans").value=6997;
+document.getElementById("artilar").value=0;
+document.getElementById("eksiler").value=10678;
+document.getElementById("pos1").value=82391;
+document.getElementById("pos2").value=0;
+document.getElementById("pos3").value=0;
+document.getElementById("pos4").value=0;
+document.getElementById("nakit").value=78490;
+document.getElementById("aksam_avans").value=7706;
+calc();
+}
+
+function sendWA(){
+const kasa=document.getElementById("kasa_sec").value;
+const kasiyer=document.getElementById("kasiyer_sec").value;
+
+const d={toplam_x:f("toplam_x"), oglen_x:f("oglen_x"), oglen_avans:f("oglen_avans"), artilar:f("artilar"), eksiler:f("eksiler"), pos1:f("pos1"), pos2:f("pos2"), pos3:f("pos3"), pos4:f("pos4"), nakit:f("nakit"), aksam_avans:f("aksam_avans")};
+const hesap=d.toplam_x-d.oglen_x+d.oglen_avans+d.artilar-d.eksiler-d.pos1-d.pos2-d.pos3-d.pos4-d.nakit-d.aksam_avans;
+const sonuc=-hesap;
+let durum=sonuc===0?"✅ KASA TAM":sonuc>0?"✅ KASA FAZLA":"⚠️ KASA EKSİK";
+
+const rapor =
+`📍 *${kasa}*  
+👤 Kasiyer: *${kasiyer}*
+
+📊 *Günlük Kasa Raporu*
+
+🧾 Toplam X: ${fmt(d.toplam_x)}
+🌞 Öğlen X: ${fmt(d.oglen_x)}
+💰 Öğlen Avans: ${fmt(d.oglen_avans)}
+
+➕ Artılar: ${fmt(d.artilar)}
+➖ Eksiler: ${fmt(d.eksiler)}
+
+💳 POS1: ${fmt(d.pos1)}
+💳 POS2: ${fmt(d.pos2)}
+💳 POS3: ${fmt(d.pos3)}
+💳 POS4: ${fmt(d.pos4)}
+
+💵 Nakit: ${fmt(d.nakit)}
+🔐 Akşam Avans: ${fmt(d.aksam_avans)}
+
+📌 Sonuç: *${fmt(sonuc)}*
+${durum}`;
+
+window.open("https://wa.me/?text="+encodeURIComponent(rapor),"_blank");
+}
+
+document.querySelectorAll("input").forEach(el=>el.addEventListener("input",calc));
+calc();
+</script>
+
+</body>
+</html>
