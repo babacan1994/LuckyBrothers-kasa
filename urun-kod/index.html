@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ürün Kodu Bul (Barkod / PLU)</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ürün Kodu Bul">
+
+  <style>
+    :root{ --bg:#f6f7fb; --card:#fff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; --btn:#111827; --btn2:#eef2ff; }
+    body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:var(--bg); color:var(--text); }
+    header{ padding:16px; background:var(--btn); color:#fff; }
+    header h1{ margin:0; font-size:18px; }
+    header p{ margin:6px 0 0; opacity:.85; font-size:13px; }
+    .wrap{ max-width:820px; margin:0 auto; padding:14px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.06); padding:14px; }
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input{
+      width:100%; box-sizing:border-box; padding:14px 12px; border-radius:14px; border:2px solid #c7d2fe;
+      font-size:20px; outline:none; background:#fff;
+    }
+    input:focus{ border-color:#6366f1; box-shadow:0 0 0 4px rgba(99,102,241,.15); }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    button{
+      border:0; padding:12px 14px; border-radius:14px; cursor:pointer;
+      font-size:14px; font-weight:600;
+    }
+    .b1{ background:var(--btn2); color:var(--btn); }
+    .b2{ background:#10b981; color:#fff; }
+    .b3{ background:#ef4444; color:#fff; }
+    .mini{ font-size:12px; color:var(--muted); margin-top:10px; line-height:1.4; }
+    .stats{ display:flex; justify-content:space-between; gap:10px; margin-top:10px; color:var(--muted); font-size:12px; }
+    .list{ margin-top:12px; display:grid; gap:10px; }
+    .item{
+      border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff;
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+    }
+    .left{ min-width:0; }
+    .name{ font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; color:var(--muted); margin-top:2px; }
+    .copy{
+      background:var(--btn); color:#fff; padding:10px 12px; border-radius:12px; font-size:13px;
+      white-space:nowrap;
+    }
+    details{ margin-top:12px; }
+    textarea{
+      width:100%; box-sizing:border-box; min-height:160px; padding:12px; border-radius:14px; border:1px solid var(--line);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size:12px;
+    }
+    .hint{ color:var(--muted); font-size:12px; margin:8px 0 0; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Ürün Kodu Bul (Ad → Kod)</h1>
+    <p>Ürün adını yaz → kodu çıkar → “Kodu Kopyala” ile kasaya yapıştır.</p>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <label for="q">Arama (ürün adı)</label>
+      <input id="q" autocomplete="off" inputmode="text" placeholder="Örnek: çilek, domates, muz, sarımsak..." />
+
+      <div class="row">
+        <button class="b1" id="btnClear">Temizle</button>
+        <button class="b1" id="btnShowAll">Hepsini Göster</button>
+        <button class="b2" id="btnFocus">Klavyeyi Aç</button>
+        <button class="b3" id="btnReset">Tüm Listeyi Sıfırla</button>
+      </div>
+
+      <div class="mini">
+        ✅ Büyük/küçük harf fark etmez (TR uyumlu).<br/>
+        ✅ “çilek” yazınca “ÇİLEK KG”, “ÇİLEK PAKET” vb. hepsini bulur.<br/>
+        ✅ “domates” yazınca domates çeşitlerini listeler.<br/>
+        ✅ Yazdığın kelime “içinde geçen” ürünleri getirir.
+      </div>
+
+      <div class="stats">
+        <div>Toplam ürün: <b id="total">0</b></div>
+        <div>Bulunan: <b id="found">0</b></div>
+      </div>
+
+      <div class="list" id="list"></div>
+
+      <details>
+        <summary><b>➕ Ürün listesini içe aktar / düzenle</b></summary>
+        <p class="hint">
+          Format: <b>KOD;ÜRÜN ADI</b> (Her satır 1 ürün).<br/>
+          Örnek: <code>2905037;ÇİLEK KG</code>
+        </p>
+        <textarea id="importBox" spellcheck="false"></textarea>
+        <div class="row">
+          <button class="b2" id="btnImport">Listeyi Kaydet</button>
+          <button class="b1" id="btnLoad">Mevcut Listeyi Göster</button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+<script>
+/* ----------------- 1) Türkçe uyumlu normalize ----------------- */
+function normalizeTR(s){
+  s = (s ?? "").toString().trim().toLowerCase("tr-TR");
+  const map = { "ç":"c","ğ":"g","ı":"i","ö":"o","ş":"s","ü":"u" };
+  s = s.replace(/[çğıöşü]/g, ch => map[ch] || ch);
+  s = s.replace(/\s+/g, " ");
+  s = s.replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+  return s;
+}
+
+/* ----------------- 2) TAM ÜRÜN LİSTESİ (eksiksiz) ----------------- */
+const DEFAULT_PRODUCTS = [
+  { code:"2906095", name:"ACUR" },
+  { code:"2906135", name:"ALIÇ" },
+  { code:"2406024", name:"ANANAS" },
+  { code:"2905109", name:"ARMUT BAL" },
+  { code:"2906127", name:"ARMUT ANKARA" },
+  { code:"2905071", name:"ARMUT DEVECİ" },
+  { code:"2905024", name:"ARMUT SANTA" },
+  { code:"2905045", name:"ASMA YAPRAĞI" },
+  { code:"2406041", name:"AVOKADO" },
+  { code:"2406068", name:"AYRELLİ" },
+  { code:"2905092", name:"AYVA" },
+  { code:"2406085", name:"BABUTSA" },
+  { code:"2906170", name:"BAKLA" },
+  { code:"2406027", name:"BAL KABAĞI" },
+  { code:"2905079", name:"BAMYA" },
+  { code:"2906180", name:"BEZELYE" },
+  { code:"2905006", name:"BİBER ACI KIRMIZI" },
+  { code:"2905007", name:"BİBER ACI YEŞİL" },
+  { code:"2907050", name:"BİBER CALIFORNIA" },
+  { code:"2905112", name:"BİBER ÇARLİ SARI" },
+  { code:"2905111", name:"BİBER ÇARLİ YEŞİL" },
+  { code:"2905114", name:"BİBER DOLMA İNCE KABUK" },
+  { code:"2905005", name:"BİBER DOLMA SARI" },
+  { code:"2905110", name:"BİBER KAPYA" },
+  { code:"2905040", name:"BÖRÜLCE" },
+  { code:"2905044", name:"BROKOLİ" },
+  { code:"2906125", name:"BRÜKSEL LAHANASI" },
+  { code:"2906083", name:"ÇAĞLA KG" },
+  { code:"2406089", name:"ÇAĞLA PAKET" },
+  { code:"2905011", name:"ÇİÇEK LAHANASI" },
+  { code:"2905026", name:"CENNET HURMA" },
+  { code:"2905037", name:"ÇİLEK KG" },
+  { code:"2406202", name:"ÇİLEK PAKET" },
+  { code:"2405061", name:"DARI" },
+  { code:"2406006", name:"DERE OTU" },
+  { code:"2905001", name:"DOMATES" },
+  { code:"2906113", name:"DOMATES BARDAK" },
+  { code:"2905008", name:"DOMATES CHERRY" },
+  { code:"2906550", name:"DOMATES ORGANİK CHERRY" },
+  { code:"2906150", name:"DOMATES SALKIM" },
+  { code:"2405135", name:"DRAGON ADET" },
+  { code:"2908058", name:"DRAGON KG" },
+  { code:"2406063", name:"DUT" },
+  { code:"2905055", name:"ELMA GALA" },
+  { code:"2906176", name:"ELMA KIRMIZI" },
+  { code:"2905034", name:"ELMA YEŞİL" },
+  { code:"2406204", name:"ENGİNAR" },
+  { code:"2905129", name:"ERİK SİYAH" },
+  { code:"2905127", name:"ERİK YEŞİL" },
+  { code:"2906110", name:"FASULYE AYŞE KADIN" },
+  { code:"2906040", name:"FASULYE BARBUNYA" },
+  { code:"2905065", name:"FASULYE SARI" },
+  { code:"2905012", name:"FASULYE TAZE" },
+  { code:"2906058", name:"FINDIK KABUKLU" },
+  { code:"2906123", name:"GÜNNAP" },
+  { code:"2406014", name:"GOLYANDRO" },
+  { code:"2406064", name:"GÖMEÇ" },
+  { code:"2905133", name:"GREYFURT" },
+  { code:"2905097", name:"GUAVA" },
+
+  { code:"2905043", name:"KAVUN" },
+  { code:"2906208", name:"KAVUN ANANAS" },
+  { code:"2905026", name:"KAVUN KIŞ KAVUNU" },
+  { code:"2905046", name:"KAYISI" },
+  { code:"2406017", name:"KEREVİZ" },
+  { code:"2906094", name:"KEREVİZ KÖK" },
+  { code:"2906167", name:"KESTANE" },
+  { code:"2905074", name:"KİRAZ" },
+  { code:"2905028", name:"KİVİ" },
+  { code:"2905043", name:"KOLAKAZ" },
+  { code:"2906112", name:"LİMON SARI" },
+  { code:"2406067", name:"LAHANA" },
+  { code:"2907091", name:"MANDALİN" },
+  { code:"2406026", name:"MANGO" },
+  { code:"2405169", name:"MANTAR İSTİRİDYE PAKET" },
+  { code:"2905041", name:"MANTAR KÜLTÜR" },
+
+  { code:"2406019", name:"MARUL" },
+  { code:"2406020", name:"MARUL KIVIRCIK" },
+  { code:"2405123", name:"MARUL İTALYAN" },
+  { code:"2406007", name:"MAYDANOZ" },
+  { code:"2408114", name:"MERSİN PAKET" },
+  { code:"2405125", name:"MOLOHİYA PAKET" },
+  { code:"2905098", name:"MUŞMULA" },
+  { code:"2905025", name:"MUZ" },
+  { code:"2906118", name:"MUZ PLANTAIN" },
+  { code:"2905072", name:"MUZ YERLİ" },
+  { code:"2406002", name:"NANE" },
+  { code:"2906042", name:"NAR" },
+  { code:"2905059", name:"NEKTARİN" },
+  { code:"2408089", name:"NERGİS" },
+  { code:"2406050", name:"POMELO" },
+  { code:"2905022", name:"PANCAR" },
+  { code:"2905064", name:"PATATES" },
+  { code:"2905117", name:"PATATES TATLI" },
+  { code:"2906173", name:"PATATES TAZE" },
+  { code:"2905018", name:"PATLICAN MOR" },
+  { code:"2905017", name:"PATLICAN SİYAH" },
+  { code:"2406003", name:"PAZI" },
+  { code:"2905124", name:"PORTAKAL" },
+  { code:"2906185", name:"PORTAKAL YAFA" },
+  { code:"2406023", name:"PIRASA" },
+  { code:"2406004", name:"ROKA" },
+  { code:"2905002", name:"SALATALIK" },
+  { code:"2406012", name:"SARIMSAK YERLİ" },
+
+  { code:"2406063", name:"SARIMSAK BAŞ" },
+  { code:"2406047", name:"SARIMSAK TAZE" },
+  { code:"2905015", name:"SARMA BEYAZ" },
+  { code:"2905132", name:"SARMA MOR" },
+  { code:"2905049", name:"ŞEKERPARE" },
+  { code:"2406008", name:"SEMİZOTU" },
+  { code:"2905052", name:"ŞEFTALİ" },
+  { code:"2906054", name:"SOĞAN BEYAZ" },
+  { code:"2906055", name:"SOĞAN MOR" },
+  { code:"2408184", name:"SOĞAN ARPACIK FİLE" },
+  { code:"2905102", name:"SOĞAN KURU" },
+  { code:"2406009", name:"SOĞAN TAZE" },
+  { code:"2406121", name:"TERE OTU" },
+  { code:"2406011", name:"TURP" },
+  { code:"2905042", name:"ÜZÜM SİYAH" },
+  { code:"2905063", name:"ÜZÜM SULTANİ" },
+  { code:"2906037", name:"ÜZÜM VERİGO" },
+  { code:"2905152", name:"YAM" },
+  { code:"2905036", name:"YENİDÜNYA KG" },
+  { code:"2406187", name:"YENİDÜNYA PAKET" },
+  { code:"2906178", name:"YER ELMASI" },
+  { code:"2905072", name:"ZENCEFİL" }
+];
+
+/* ----------------- 3) Storage ----------------- */
+const KEY = "urun_kod_listesi_v1";
+
+function loadProducts(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return DEFAULT_PRODUCTS.slice();
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) return DEFAULT_PRODUCTS.slice();
+    return arr
+      .map(x => ({ code:String(x.code||"").trim(), name:String(x.name||"").trim() }))
+      .filter(x => x.code && x.name);
+  }catch(e){
+    return DEFAULT_PRODUCTS.slice();
+  }
+}
+function saveProducts(arr){
+  localStorage.setItem(KEY, JSON.stringify(arr));
+}
+
+/* ----------------- 4) UI helpers ----------------- */
+const qEl = document.getElementById("q");
+const listEl = document.getElementById("list");
+const totalEl = document.getElementById("total");
+const foundEl = document.getElementById("found");
+const importBox = document.getElementById("importBox");
+
+let products = loadProducts();
+
+function rebuildIndex(){
+  products = products.map(p => ({
+    ...p,
+    n_name: normalizeTR(p.name),
+    n_code: normalizeTR(p.code)
+  }));
+  totalEl.textContent = products.length;
+}
+rebuildIndex();
+
+function render(items){
+  listEl.innerHTML = "";
+  foundEl.textContent = items.length;
+
+  if(items.length === 0){
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `<div class="left">
+        <div class="name">Sonuç yok</div>
+        <div class="code">Ürün adını farklı yazmayı dene: "cilek", "domates", "muz" gibi.</div>
+      </div>`;
+    listEl.appendChild(div);
+    return;
+  }
+
+  for(const it of items){
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <div class="left">
+        <div class="name" title="${escapeHtml(it.name)}">${escapeHtml(it.name)}</div>
+        <div class="code">Kod: <b>${escapeHtml(it.code)}</b></div>
+      </div>
+      <button class="copy">Kodu Kopyala</button>
+    `;
+
+    div.querySelector(".copy").addEventListener("click", async () => {
+      try{
+        await navigator.clipboard.writeText(it.code);
+        div.querySelector(".copy").textContent = "Kopyalandı ✅";
+        setTimeout(()=> div.querySelector(".copy").textContent = "Kodu Kopyala", 900);
+      }catch(e){
+        alert("Kopyalama olmadı. Kodu seçip manuel kopyala: " + it.code);
+      }
+    });
+
+    listEl.appendChild(div);
+  }
+}
+
+function escapeHtml(s){
+  return (s ?? "").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+/* ----------------- 5) Arama ----------------- */
+function search(){
+  const q = normalizeTR(qEl.value);
+
+  if(!q){
+    listEl.innerHTML = "";
+    foundEl.textContent = "0";
+    return;
+  }
+
+  const parts = q.split(" ").filter(Boolean);
+
+  const results = products.filter(p => {
+    const hay = p.n_name + " " + p.n_code;
+    return parts.every(part => hay.includes(part));
+  });
+
+  results.sort((a,b) => a.name.localeCompare(b.name, "tr"));
+  render(results);
+}
+
+/* ----------------- 6) Butonlar ----------------- */
+document.getElementById("btnClear").addEventListener("click", () => {
+  qEl.value = "";
+  qEl.focus();
+  listEl.innerHTML = "";
+  foundEl.textContent = "0";
+});
+
+document.getElementById("btnShowAll").addEventListener("click", () => {
+  const all = products.slice().sort((a,b) => a.name.localeCompare(b.name, "tr"));
+  render(all);
+});
+
+document.getElementById("btnFocus").addEventListener("click", () => qEl.focus());
+
+document.getElementById("btnReset").addEventListener("click", () => {
+  if(confirm("Tüm kayıtlı ürün listesini sıfırlayayım mı? (Varsayılan liste kalır)")){
+    localStorage.removeItem(KEY);
+    products = loadProducts();
+    rebuildIndex();
+    listEl.innerHTML = "";
+    foundEl.textContent = "0";
+    alert("Sıfırlandı ✅");
+  }
+});
+
+document.getElementById("btnLoad").addEventListener("click", () => {
+  const plain = products.map(p => `${p.code};${p.name}`).join("\n");
+  importBox.value = plain;
+});
+
+document.getElementById("btnImport").addEventListener("click", () => {
+  const lines = importBox.value.split("\n").map(x => x.trim()).filter(Boolean);
+  const arr = [];
+  for(const line of lines){
+    let code="", name="";
+    if(line.includes(";")){
+      [code, name] = line.split(";").map(x => x.trim());
+    }else if(line.includes(",")){
+      [code, name] = line.split(",").map(x => x.trim());
+    }else{
+      const m = line.match(/^(\S+)\s+(.*)$/);
+      if(m){ code=m[1]; name=m[2]; }
+    }
+    if(code && name) arr.push({ code, name });
+  }
+
+  if(arr.length === 0){
+    alert("Liste boş veya format yanlış. Örnek: 2905037;ÇİLEK KG");
+    return;
+  }
+
+  // Aynı kod tekrar gelirse son yazılan kalsın
+  const map = new Map();
+  for(const p of arr){
+    map.set(String(p.code).trim(), { code:String(p.code).trim(), name:String(p.name).trim() });
+  }
+  const finalArr = Array.from(map.values());
+
+  saveProducts(finalArr);
+  products = loadProducts();
+  rebuildIndex();
+  alert("Kaydedildi ✅");
+  search();
+});
+
+/* ----------------- 7) Live search ----------------- */
+qEl.addEventListener("input", search);
+
+/* İlk açılış */
+totalEl.textContent = products.length;
+foundEl.textContent = "0";
+</script>
+
+<script>
+/* Service Worker (offline) kayıt */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
